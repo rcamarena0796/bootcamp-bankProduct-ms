@@ -11,7 +11,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @AllArgsConstructor
 @Document(collection = "BANK_PRODUCT_TIPE")
 @EqualsAndHashCode(callSuper = false)
-public class BankProductTipe {
+public class BankProductType {
 	private String id2;
 	private String name;
 }
