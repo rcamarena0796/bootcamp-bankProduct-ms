@@ -92,8 +92,10 @@ public class BankProductServiceImp implements BankProductService{
     }
 
     @Override
-    public Mono<Void> delete(BankProduct bp) {
-        return bankRepo.delete(bp);
+    public Mono<Void> delete(String id) {
+        return bankRepo.findById(id).flatMap(cl -> {
+            return bankRepo.delete(cl);
+        });
     }
 
     @Override

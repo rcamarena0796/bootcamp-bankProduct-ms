@@ -2,6 +2,8 @@ package com.everis.bootcamp.bankproductms.controller;
 
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.net.URI;
@@ -14,16 +16,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
-import org.springframework.validation.BeanPropertyBindingResult;
-import org.springframework.validation.Errors;
-import org.springframework.validation.Validator;
-
-import org.springframework.web.reactive.function.server.ServerRequest;
-import org.springframework.web.reactive.function.server.ServerResponse;
-
-import static org.springframework.web.reactive.function.BodyInserters.fromValue;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -34,13 +27,13 @@ import org.springframework.http.ResponseEntity;
 
 import javax.validation.Valid;
 
+@Api(tags = "Bank Product API",  value = "Operations for bank products")
 @RestController
 @RequestMapping("/api/bankProduct")
 public class BankProductController {
 
     @Autowired
     private BankProductService service;
-
 
 
     @GetMapping("/test")
@@ -50,27 +43,26 @@ public class BankProductController {
         return Mono.justOrEmpty(hola);
     }
 
-    @GetMapping("/selectAll")
-    public Mono<ResponseEntity<Flux<BankProduct>>> list() {
-        return Mono.just(ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(service.findAll()));
-    }
-
+    @ApiOperation(value = "Service used to find all bank products")
     @GetMapping("/findAll")
     public Flux<BankProduct> findAll() {
         return service.findAll();
     }
 
+    @ApiOperation(value = "Service used to find a bank product by id")
     @GetMapping("/findById/{id}")
     public Mono<BankProduct> findById(@PathVariable("id") String id) {
         return service.findById(id);
     }
 
-    @GetMapping("/findByNumDoc/{numDoc}")
-    public Mono<BankProduct> findByNumDoc(@PathVariable("numDoc") String numDoc) {
-        return service.findByClientNumDoc(numDoc);
+    @ApiOperation(value = "Service used to find a bank product by clientNumDoc")
+    @GetMapping("/find/{clientNumDoc}")
+    public Mono<BankProduct> findByClientNumDoc(@PathVariable("clientNumDoc") String clientNumDoc) {
+        return service.findByClientNumDoc(clientNumDoc);
     }
 
-
+    //GUARDAR UN CLIENTE
+    @ApiOperation(value = "Service used to save a bank product")
     @PostMapping("/save")
     public Mono<ResponseEntity<BankProduct>> create(@Valid @RequestBody BankProduct bp) {
         return service.save(bp).map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
@@ -79,6 +71,7 @@ public class BankProductController {
 
 
     //ACTUALIZAR UN CLIENTE
+    @ApiOperation(value = "Service used to update a bank product")
     @PutMapping("/update/{id}")
     public Mono<ResponseEntity<BankProduct>> update(@PathVariable("id") String id, @RequestBody BankProduct bp) {
         return service.update(bp, id)
@@ -89,12 +82,11 @@ public class BankProductController {
 
 
     //ELIMINAR UN CLIENTE
+    @ApiOperation(value = "Service used to delete a bank product")
     @DeleteMapping("/delete/{id}")
     public Mono<ResponseEntity<Void>> delete(@PathVariable String id) {
-        return service.findById(id)
-                .flatMap(c -> {
-                    return service.delete(c)
-                            .then(Mono.just(new ResponseEntity<Void>(HttpStatus.NO_CONTENT)));
-                }).defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
+        return service.delete(id)
+                .then(Mono.just(new ResponseEntity<Void>(HttpStatus.NO_CONTENT)))
+                .defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
     }
 }

@@ -12,6 +12,6 @@ public interface BankProductService {
     public Mono<BankProduct> findByClientNumDoc(String numDoc);
     public Flux<BankProduct> findAll();
     public Mono<BankProduct> update(BankProduct bp, String id);
-    public Mono<Void> delete(BankProduct bp);
+    public Mono<Void> delete(String bp);
     public Mono<BankProduct> save (BankProduct bp);
 }
