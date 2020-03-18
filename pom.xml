@@ -85,6 +85,13 @@
 			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>io.reactivex</groupId>
+			<artifactId>rxjava-reactive-streams</artifactId>
+			<version>1.2.1</version>
+		</dependency>
+
 	</dependencies>
 
 	<dependencyManagement>

@@ -9,9 +9,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "BANK_PRODUCT_TIPE")
+@Document(collection = "BANK_PRODUCT_TYPE")
 @EqualsAndHashCode(callSuper = false)
 public class BankProductType {
-	private String id2;
+	private String numId;
 	private String name;
 }

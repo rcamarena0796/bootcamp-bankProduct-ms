@@ -22,6 +22,7 @@ public class BankProduct {
 	@NotBlank(message = "'numAccount' is required")
 	private String numAccount;
 	private String bankName;
+	@NotBlank(message = "'idProdType' is required")
 	private String idProdType;
 	private double total;
 	@NotBlank(message = "'clientNumDoc' is required")

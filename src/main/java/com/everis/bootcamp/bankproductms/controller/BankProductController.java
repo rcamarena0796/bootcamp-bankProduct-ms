@@ -50,15 +50,9 @@ public class BankProductController {
     }
 
     @ApiOperation(value = "Service used to find a bank product by id")
-    @GetMapping("/findById/{id}")
+    @GetMapping("/find/{id}")
     public Mono<BankProduct> findById(@PathVariable("id") String id) {
         return service.findById(id);
-    }
-
-    @ApiOperation(value = "Service used to find a bank product by clientNumDoc")
-    @GetMapping("/find/{clientNumDoc}")
-    public Mono<BankProduct> findByClientNumDoc(@PathVariable("clientNumDoc") String clientNumDoc) {
-        return service.findByClientNumDoc(clientNumDoc);
     }
 
     //GUARDAR UN CLIENTE
