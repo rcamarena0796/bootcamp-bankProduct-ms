@@ -59,7 +59,7 @@ public class BankProductController {
     @ApiOperation(value = "Service used to save a bank product")
     @PostMapping("/save")
     public Mono<ResponseEntity<BankProduct>> create(@Valid @RequestBody BankProduct bp) {
-        return service.save(bp).map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
+        return service.saveV2(bp).map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
                 .contentType(MediaType.APPLICATION_JSON).body(b));
     }
 

@@ -21,7 +21,7 @@ public class BankProductTypeServiceImpl implements BankProductTypeService {
 
 
     @Override
-    public Mono<BankProductType> findByNumId(int numId) {
+    public Mono<BankProductType> findByNumId(String numId) {
         return repo.findByNumId(numId);
     }
 }

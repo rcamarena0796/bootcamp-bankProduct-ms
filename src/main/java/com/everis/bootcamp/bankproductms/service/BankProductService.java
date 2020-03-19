@@ -14,4 +14,5 @@ public interface BankProductService {
     public Mono<BankProduct> update(BankProduct bp, String id);
     public Mono<Void> delete(String bp);
     public Mono<BankProduct> save (BankProduct bp);
+    public Mono<BankProduct> saveV2 (BankProduct bp);
 }

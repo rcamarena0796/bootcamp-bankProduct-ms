@@ -8,5 +8,5 @@ import org.springframework.data.mongodb.repository.ReactiveMongoRepository;
 import reactor.core.publisher.Mono;
 
 public interface BankProductTypeRepository extends ReactiveMongoRepository<BankProductType, String> {
-    public Mono<BankProductType> findByNumId(int numId);
+    public Mono<BankProductType> findByNumId(String numId);
 }
