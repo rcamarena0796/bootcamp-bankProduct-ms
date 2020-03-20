@@ -91,7 +91,7 @@ public class BankProductController {
     //TRANSACCION
     @ApiOperation(value = "Service used to manage money transactions of a bank product")
     @PutMapping("/transaction/{id}")
-    public Mono<ResponseEntity<BankProduct>> update(@PathVariable("id") String id, @RequestBody double money) {
+    public Mono<ResponseEntity<BankProduct>> transaction(@PathVariable("id") String id, @RequestBody double money) {
         return service.moneyTransaction(id, money)
                 .map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
                         .contentType(MediaType.APPLICATION_JSON).body(b))
