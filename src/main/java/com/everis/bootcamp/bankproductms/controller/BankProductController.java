@@ -1,6 +1,7 @@
 package com.everis.bootcamp.bankproductms.controller;
 
 import com.everis.bootcamp.bankproductms.model.BankProduct;
+import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -35,7 +36,6 @@ public class BankProductController {
     @Autowired
     private BankProductService service;
 
-
     @GetMapping("/test")
     public Mono<BankProduct> saludo() {
         BankProduct hola = new BankProduct();
@@ -55,7 +55,13 @@ public class BankProductController {
         return service.findById(id);
     }
 
-    //GUARDAR UN CLIENTE
+    @ApiOperation(value = "Service used to return transaction log of a bank product")
+    @GetMapping("/log/{clientNumDoc}")
+    public Flux<BankProductTransactionLog> findLogByClientNumDoc(@PathVariable("clientNumDoc") String clientNumDoc) {
+        return service.findLogByClientNumDoc(clientNumDoc);
+    }
+
+    //GUARDAR
     @ApiOperation(value = "Service used to save a bank product")
     @PostMapping("/save")
     public Mono<ResponseEntity<BankProduct>> create(@Valid @RequestBody BankProduct bp) {
@@ -63,8 +69,7 @@ public class BankProductController {
                 .contentType(MediaType.APPLICATION_JSON).body(b));
     }
 
-
-    //ACTUALIZAR UN CLIENTE
+    //ACTUALIZAR
     @ApiOperation(value = "Service used to update a bank product")
     @PutMapping("/update/{id}")
     public Mono<ResponseEntity<BankProduct>> update(@PathVariable("id") String id, @RequestBody BankProduct bp) {
@@ -74,13 +79,22 @@ public class BankProductController {
                 .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 
-
-    //ELIMINAR UN CLIENTE
+    //ELIMINAR
     @ApiOperation(value = "Service used to delete a bank product")
     @DeleteMapping("/delete/{id}")
     public Mono<ResponseEntity<Void>> delete(@PathVariable String id) {
         return service.delete(id)
                 .then(Mono.just(new ResponseEntity<Void>(HttpStatus.NO_CONTENT)))
                 .defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
+    }
+
+    //TRANSACCION
+    @ApiOperation(value = "Service used to manage money transactions of a bank product")
+    @PutMapping("/transaction/{id}")
+    public Mono<ResponseEntity<BankProduct>> update(@PathVariable("id") String id, @RequestBody double money) {
+        return service.moneyTransaction(id, money)
+                .map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
+                        .contentType(MediaType.APPLICATION_JSON).body(b))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }

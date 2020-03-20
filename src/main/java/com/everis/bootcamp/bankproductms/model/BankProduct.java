@@ -10,7 +10,9 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 import javax.validation.constraints.NotBlank;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -28,9 +30,8 @@ public class BankProduct {
 	private double total;
 	@NotBlank(message = "'clientNumDoc' is required")
 	private String clientNumDoc;
-	@NotBlank(message = "'holders' is required")
-	private List<String> holders;
-	private List<String> authorized;
+	private Set<String> holders;
+	private Set<String> authorized;
 	@JsonFormat(pattern = "yyyy-MM-dd")
 	private Date createDate;
 	@JsonFormat(pattern = "yyyy-MM-dd")

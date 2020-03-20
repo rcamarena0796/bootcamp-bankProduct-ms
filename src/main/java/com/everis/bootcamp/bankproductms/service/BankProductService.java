@@ -1,6 +1,7 @@
 package com.everis.bootcamp.bankproductms.service;
 
 import com.everis.bootcamp.bankproductms.model.BankProduct;
+import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.model.BankProductType;
 
 import reactor.core.publisher.Flux;
@@ -15,4 +16,6 @@ public interface BankProductService {
     public Mono<Void> delete(String bp);
     public Mono<BankProduct> save (BankProduct bp);
     public Mono<BankProduct> saveV2 (BankProduct bp);
+    public Mono<BankProduct> moneyTransaction(String id, double money);
+    public Flux<BankProductTransactionLog> findLogByClientNumDoc(String numDoc);
 }

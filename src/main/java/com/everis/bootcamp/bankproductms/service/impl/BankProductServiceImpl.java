@@ -1,13 +1,12 @@
 package com.everis.bootcamp.bankproductms.service.impl;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 import com.everis.bootcamp.bankproductms.dao.BankProductRepository;
+import com.everis.bootcamp.bankproductms.dao.BankProductTransactionLogRepository;
 import com.everis.bootcamp.bankproductms.dao.BankProductTypeRepository;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
+import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -27,7 +26,9 @@ public class BankProductServiceImpl implements BankProductService {
 
     @Autowired
     private BankProductRepository bankRepo;
-    private BankProductTypeRepository bankProdTypeRepo;
+
+    @Autowired
+    private BankProductTransactionLogRepository logRepo;
 
 
     @Override
@@ -43,6 +44,12 @@ public class BankProductServiceImpl implements BankProductService {
     @Override
     public Flux<BankProduct> findByClientNumDoc(String numDoc) {
         return bankRepo.findAllByClientNumDoc(numDoc);
+    }
+
+    @Override
+    public Flux<BankProductTransactionLog> findLogByClientNumDoc(String numDoc) {
+
+        return logRepo.findAllByClientNumDoc(numDoc);
     }
 
     @Override
@@ -89,6 +96,27 @@ public class BankProductServiceImpl implements BankProductService {
                             dbBankProd.setBankName(bp.getBankName());
                         }
 
+                        //holders
+                        if (bp.getHolders() != null) {
+                            //verificar que lista interna no sea nula
+                            if (dbBankProd.getHolders() == null) {
+                                dbBankProd.setHolders(new HashSet<>());
+                            }
+                            //combinar lista con lista interna y borrar duplicados
+                            Set<String> holders = dbBankProd.getHolders();
+                            holders.addAll(bp.getHolders());
+                        }
+
+                        //authorized
+                        if (bp.getAuthorized() != null) {
+                            //verificar que lista interna no sea nula
+                            if (dbBankProd.getAuthorized() == null) {
+                                dbBankProd.setAuthorized(new HashSet<>());
+                            }
+                            //combinar lista con lista interna y borrar duplicados
+                            Set<String> authorized = dbBankProd.getAuthorized();
+                            authorized.addAll(bp.getAuthorized());
+                        }
 
                         return bankRepo.save(dbBankProd);
 
@@ -138,6 +166,13 @@ public class BankProductServiceImpl implements BankProductService {
             } else {
                 bp.setCreateDate(bp.getCreateDate());
             }
+            //Añadir numDocCliente a Holders
+            Set<String> holders = new HashSet<>();
+            holders.add(bp.getClientNumDoc());
+            bp.setHolders(holders);
+            //crear authorized
+            bp.setAuthorized(new HashSet<>());
+
             String idProdType = bp.getIdProdType();
             //traer al tipo de cliente de la api clientes
             Mono<String> clientType = getClientTypeFromApi(bp.getClientNumDoc());
@@ -189,6 +224,31 @@ public class BankProductServiceImpl implements BankProductService {
             return Mono.error(e);
         }
 
+    }
+
+    @Override
+    public Mono<BankProduct> moneyTransaction(String id, double money) {
+        try {
+            return bankRepo.findById(id)
+                    .flatMap(dbBankProd -> {
+                        double currentMoney = dbBankProd.getTotal();
+                        if (currentMoney + money > 0) {
+                            dbBankProd.setTotal(currentMoney + money);
+                        } else {
+                            return Mono.error(new Exception("Monto de retiro supera el monto total de la cuenta"));
+                        }
+
+                        //guardar log
+                        BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
+                                dbBankProd.getNumAccount(), dbBankProd.getTotal()-money, money,new Date());
+                        logRepo.save(transactionLog).subscribe();
+
+                        return bankRepo.save(dbBankProd);
+
+                    }).switchIfEmpty(Mono.error(new Exception("cuenta no encontrada")));
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
     }
 
     @Override
