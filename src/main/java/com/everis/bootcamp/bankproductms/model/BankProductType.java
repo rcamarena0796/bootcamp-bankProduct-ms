@@ -14,5 +14,4 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class BankProductType {
 	private String numId;
 	private String name;
-	private int maxAccounts;
 }
