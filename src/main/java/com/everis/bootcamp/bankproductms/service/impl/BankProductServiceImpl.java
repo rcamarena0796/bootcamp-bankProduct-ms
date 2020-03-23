@@ -176,6 +176,7 @@ public class BankProductServiceImpl implements BankProductService {
             String idProdType = bp.getIdProdType();
             //traer al tipo de cliente de la api clientes
             Mono<String> clientType = getClientTypeFromApi(bp.getClientNumDoc());
+
             return clientType.flatMap(ct -> {
                 logger.info("client type -> " + ct);
                 if (!ct.equals("-1")) {
