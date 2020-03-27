@@ -28,6 +28,9 @@ public class BankProduct {
 	@NotBlank(message = "'idProdType' is required")
 	private String idProdType;
 	private double total;
+	private double minFin;
+	private int maxTransactions;
+	private int currentTransNumber;
 	@NotBlank(message = "'clientNumDoc' is required")
 	private String clientNumDoc;
 	private Set<String> holders;
@@ -36,5 +39,7 @@ public class BankProduct {
 	private Date createDate;
 	@JsonFormat(pattern = "yyyy-MM-dd")
 	private Date modifyDate;
+	@JsonFormat(pattern = "yyyy-MM-dd")
+	private Date lastTransactionDate;
 
 }

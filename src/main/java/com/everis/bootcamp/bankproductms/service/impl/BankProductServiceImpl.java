@@ -2,10 +2,9 @@ package com.everis.bootcamp.bankproductms.service.impl;
 
 import java.util.*;
 
-import com.everis.bootcamp.bankproductms.dao.BankProductRepository;
-import com.everis.bootcamp.bankproductms.dao.BankProductTransactionLogRepository;
-import com.everis.bootcamp.bankproductms.dao.BankProductTypeRepository;
+import com.everis.bootcamp.bankproductms.dao.*;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
+import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -19,6 +18,8 @@ import org.springframework.stereotype.Service;
 
 import reactor.core.publisher.Flux;
 
+import static java.lang.StrictMath.abs;
+
 @Service
 public class BankProductServiceImpl implements BankProductService {
 
@@ -29,6 +30,12 @@ public class BankProductServiceImpl implements BankProductService {
 
     @Autowired
     private BankProductTransactionLogRepository logRepo;
+
+    @Autowired
+    private ComissionRepository comissionRepo;
+
+    @Autowired
+    private BankProductComissionRepository bankProdComissionRepo;
 
 
     @Override
@@ -150,7 +157,7 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     private Mono<String> getClientTypeFromApi(String numDoc) {
-        String url = "http://localhost:8001/api/client/getClientType/" + numDoc;
+        String url = "http://localhost:8001/client/getClientType/" + numDoc;
         return WebClient.create()
                 .get()
                 .uri(url)
@@ -158,14 +165,89 @@ public class BankProductServiceImpl implements BankProductService {
                 .bodyToMono(String.class);
     }
 
+    private Mono<BankProduct> saveNewClientTypes(String ct, String idProdType, BankProduct bp) {
+        //verificar monto minimo y monto fin
+        if (bp.getTotal() <= 0) {
+            return Mono.error(new Exception("Ingresar monto minimo de creacion"));
+        } else if (bp.getMinFin() <= 0) {
+            return Mono.error(new Exception("Ingresar monto minimo de fin de mes"));
+        }
+
+        if (ct.equals("3")) { //personal VIP
+            if (idProdType.equals("1") || idProdType.equals("2") || idProdType.equals("3")) {
+                return bankRepo.save(bp);
+            }
+            return Mono.error(new Exception("Tipo de cuenta no soportado"));
+
+        } else if (ct.equals("4")) { //PYME
+            if (idProdType.equals("2")) {
+                return bankRepo.save(bp);
+            }
+            return Mono.error(new Exception("Tipo de cuenta no soportado"));
+
+        } else {// Corporativo
+            if (idProdType.equals("2")) {
+                return bankRepo.save(bp);
+            }
+            return Mono.error(new Exception("Tipo de cuenta no soportado"));
+        }
+    }
+
+
+    private Mono<BankProduct> saveCliPerEmp(String ct, String idProdType, BankProduct bp) {
+        if (bp.getMinFin() != 0) {
+            return Mono.error(new Exception("Un cliente personal o empresarial no puede tener monto minimo de fin de mes"));
+        }
+
+        if (ct.equals("1")) { //personal
+
+            if (idProdType.equals("1") || idProdType.equals("2") || idProdType.equals("3"))
+            //si lo es, buscar el numero de cuentas con numDoc del cliente
+            {
+                //buscar todos los productos que coincidan con numDoc y idProdType 1,2 o 3
+                List<String> ids = Arrays.asList("1", "2", "3");
+                Flux<BankProduct> productosCliente = bankRepo.findByClientNumDocAndIdProdTypeIn(bp.getClientNumDoc(), ids);
+                Mono<Long> cantAccounts = productosCliente.count();
+                return cantAccounts.flatMap(c -> {
+                    logger.info("cantidad de cuentas = " + c.toString());
+                    if (c >= 1) {
+                        return Mono.error(new Exception("Un cliente personal solo puede tener un máximo de una cuenta de ahorro, una cuenta corriente o cuentas a plazo fijo."));
+                    }
+                    return bankRepo.save(bp);
+                });
+            }
+            return Mono.error(new Exception("Tipo de cuenta no soportado"));
+
+        } else { //empresarial
+            //ver si el tipo de cuenta es ahorro o plazo fijo
+            if (idProdType.equals("1") || idProdType.equals("2")) {
+                //si es una de esas, no dejar guardar
+                return Mono.error(new Exception("Un cliente empresarial no puede tener cuenta de ahorro ni de plazo fijo."));
+
+            } else if (idProdType.equals("3")) {
+                //si es cuenta corriente guardar nomas
+                return bankRepo.save(bp);
+            }
+            return Mono.error(new Exception("Tipo de cuenta no soportado"));
+        }
+    }
+
     @Override
-    public Mono<BankProduct> saveV2(BankProduct bp) {
+    public Mono<BankProduct> save(BankProduct bp) {
         try {
             if (bp.getCreateDate() == null) {
                 bp.setCreateDate(new Date());
             } else {
                 bp.setCreateDate(bp.getCreateDate());
             }
+            if (bp.getMaxTransactions() <= 0) {
+                return Mono.error(new Exception("Ingresar un número de transacciones máximas válido"));
+            }
+            bp.setCurrentTransNumber(0);
+            if (bp.getTotal() < 0) {
+                return Mono.error(new Exception("Ingresar un saldo valido"));
+            }
+            bp.setLastTransactionDate(new Date());
             //Añadir numDocCliente a Holders
             Set<String> holders = new HashSet<>();
             holders.add(bp.getClientNumDoc());
@@ -181,36 +263,10 @@ public class BankProductServiceImpl implements BankProductService {
                 logger.info("client type -> " + ct);
                 if (!ct.equals("-1")) {
                     //si al final existe, buscar el tipo de cliente
-                    if (ct.equals("1")) { //personal
-
-                        if (idProdType.equals("1") || idProdType.equals("2") || idProdType.equals("3"))
-                        //si lo es, buscar el numero de cuentas con numDoc del cliente
-                        {
-                            //buscar todos los productos que coincidan con numDoc y idProdType 1,2 o 3
-                            List<String> ids = Arrays.asList("1", "2", "3");
-                            Flux<BankProduct> productosCliente = bankRepo.findByClientNumDocAndIdProdTypeIn(bp.getClientNumDoc(), ids);
-                            Mono<Long> cantAccounts = productosCliente.count();
-                            return cantAccounts.flatMap(c -> {
-                                logger.info("cantidad de cuentas = " + c.toString());
-                                if (c >= 1) {
-                                    return Mono.error(new Exception("Un cliente personal solo puede tener un máximo de una cuenta de ahorro, una cuenta corriente o cuentas a plazo fijo."));
-                                }
-                                return bankRepo.save(bp);
-                            });
-                        }
-                        return Mono.error(new Exception("Tipo de cuenta no soportado"));
-
-                    } else if (ct.equals("2")) { //empresarial
-                        //ver si el tipo de cuenta es ahorro o plazo fijo
-                        if (idProdType.equals("1") || idProdType.equals("2")) {
-                            //si es una de esas, no dejar guardar
-                            return Mono.error(new Exception("Un cliente empresarial no puede tener cuenta de ahorro ni de plazo fijo."));
-
-                        } else if (idProdType.equals("3")) {
-                            //si es cuenta corriente guardar nomas
-                            return bankRepo.save(bp);
-                        }
-                        return Mono.error(new Exception("Tipo de cuenta no soportado"));
+                    if (ct.equals("1") || ct.equals("2")) {
+                        return saveCliPerEmp(ct, idProdType, bp);
+                    } else if (ct.equals("3") || ct.equals("4") || ct.equals("5")) {
+                        return saveNewClientTypes(ct, idProdType, bp);
                     }
 
                     return Mono.error(new Exception("Tipo de cliente no soportado"));
@@ -227,24 +283,59 @@ public class BankProductServiceImpl implements BankProductService {
 
     }
 
+    private Boolean diferentMonth(BankProduct bp) {
+        Calendar today = Calendar.getInstance();
+        today.setTime(new Date());
+        Calendar lastTrans = Calendar.getInstance();
+        today.setTime(bp.getLastTransactionDate());
+        return today.get(Calendar.MONTH) != lastTrans.get(Calendar.MONTH);
+    }
+
     @Override
     public Mono<BankProduct> moneyTransaction(String id, double money) {
         try {
             return bankRepo.findById(id)
                     .flatMap(dbBankProd -> {
-                        double currentMoney = dbBankProd.getTotal();
-                        if (currentMoney + money > 0) {
-                            dbBankProd.setTotal(currentMoney + money);
-                        } else {
-                            return Mono.error(new Exception("Monto de retiro supera el monto total de la cuenta"));
+                        //resetear numero de transaccion actual si cambio el mes
+                        if (diferentMonth(dbBankProd)) {
+                            dbBankProd.setCurrentTransNumber(0);
                         }
+                        //verificar si se debe pagar comision
+                        return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(perc -> {
 
-                        //guardar log
-                        BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
-                                dbBankProd.getNumAccount(), dbBankProd.getTotal()-money, money,new Date());
-                        logRepo.save(transactionLog).subscribe();
+                            double comission = abs(money * perc.getComission());
+                            double amount = money;
 
-                        return bankRepo.save(dbBankProd);
+                            boolean comissionAplicable =dbBankProd.getCurrentTransNumber() <= dbBankProd.getMaxTransactions();
+
+                            if (comissionAplicable) {
+                                //aplicar comision
+                                amount = money - comission;
+                            }
+
+                            double currentMoney = dbBankProd.getTotal();
+
+                            if (currentMoney + amount > dbBankProd.getMinFin()) {
+                                dbBankProd.setTotal(currentMoney + amount);
+                                dbBankProd.setCurrentTransNumber(dbBankProd.getCurrentTransNumber() + 1);
+                                //guardar log de comisiones
+                                if(comissionAplicable){
+                                    BankProductComission bpc =  new BankProductComission(dbBankProd.getNumAccount(),
+                                            comission,new Date());
+                                    bankProdComissionRepo.save(bpc).subscribe() ;
+                                }
+                            } else {
+                                return Mono.error(new Exception("Monto de retiro supera el monto minimo de la cuenta"));
+                            }
+
+                            //guardar log
+                            BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
+                                    dbBankProd.getNumAccount(), dbBankProd.getTotal() - money, money, new Date());
+                            logRepo.save(transactionLog).subscribe();
+
+                            return bankRepo.save(dbBankProd);
+
+                        });
 
                     }).switchIfEmpty(Mono.error(new Exception("cuenta no encontrada")));
         } catch (Exception e) {
@@ -252,37 +343,4 @@ public class BankProductServiceImpl implements BankProductService {
         }
     }
 
-    @Override
-    public Mono<BankProduct> save(BankProduct bp) {
-        try {
-            if (bp.getCreateDate() == null) {
-                bp.setCreateDate(new Date());
-            } else {
-                bp.setCreateDate(bp.getCreateDate());
-            }
-            //verificar si el cliente existe
-
-            //verificar si es ahorro o corriente o plazo fijo
-            String tipoCuenta = bp.getIdProdType();
-            logger.info("tipoCuenta:" + tipoCuenta);
-            if (tipoCuenta.equals("1") || tipoCuenta.equals("2") || tipoCuenta.equals("3"))
-            //si lo es, buscar el numero de cuentas con numDoc del cliente
-            {
-                Flux<BankProduct> productosCliente = bankRepo.findAllByClientNumDoc(bp.getClientNumDoc());
-                Mono<Long> cantAccounts = productosCliente.count();
-                long n = cantAccounts.block();
-                if (n > 1) {
-                    return Mono.error(new Exception("Un cliente personal solo puede tener un máximo de una cuenta de ahorro, una cuenta corriente o cuentas a plazo fijo."));
-                }
-            }
-            return bankRepo.save(bp);
-
-            /*return bankRepo.findAllByClientNumDoc(bp.getClientNumDoc())
-                    .flatMap(productosCliente)
-*/
-
-        } catch (Exception e) {
-            return Mono.error(e);
-        }
-    }
 }
