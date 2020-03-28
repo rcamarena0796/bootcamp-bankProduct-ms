@@ -9,12 +9,22 @@ import reactor.core.publisher.Mono;
 
 public interface BankProductService {
     public Mono<BankProduct> findByNumAccount(String name);
+
     public Mono<BankProduct> findById(String id);
+
     public Flux<BankProduct> findByClientNumDoc(String numDoc);
+
     public Flux<BankProduct> findAll();
+
     public Mono<BankProduct> update(BankProduct bp, String id);
+
     public Mono<Void> delete(String bp);
-    public Mono<BankProduct> save (BankProduct bp);
+
+    public Mono<BankProduct> save(BankProduct bp);
+
     public Mono<BankProduct> moneyTransaction(String id, double money);
+
     public Flux<BankProductTransactionLog> findLogByClientNumDoc(String numDoc);
+
+    public Mono<BankProduct> payCreditProduct(String id, double money, String creditNumber);
 }

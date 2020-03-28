@@ -343,4 +343,20 @@ public class BankProductServiceImpl implements BankProductService {
         }
     }
 
+
+
+    @Override
+    public Mono<BankProduct> payCreditProduct(String id, double money, String creditNumber) {
+        try {
+            //traer monto a pagar del producto de credito de microservicio de productos de credito
+            //reducir monto de producto bancario
+            //enviar monto a microservicio de credito
+            return Mono.empty();
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+
+
 }
