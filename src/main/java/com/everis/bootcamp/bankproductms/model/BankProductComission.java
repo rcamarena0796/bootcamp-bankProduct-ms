@@ -16,6 +16,7 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = false)
 public class BankProductComission {
     private String numAccount;
+    private double transactionMoney;
     private double comission;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private Date comissionDate;

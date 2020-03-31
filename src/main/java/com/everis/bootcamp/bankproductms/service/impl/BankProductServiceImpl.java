@@ -2,11 +2,13 @@ package com.everis.bootcamp.bankproductms.service.impl;
 
 import java.util.*;
 
+import com.everis.bootcamp.bankproductms.DTO.DatesDTO;
 import com.everis.bootcamp.bankproductms.dao.*;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -127,7 +129,7 @@ public class BankProductServiceImpl implements BankProductService {
 
                         return bankRepo.save(dbBankProd);
 
-                    }).switchIfEmpty(Mono.empty());
+                    }).switchIfEmpty(Mono.error(new Exception("cuenta bancaria no encontrada")));
         } catch (Exception e) {
             return Mono.error(e);
         }
@@ -292,21 +294,21 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     @Override
-    public Mono<BankProduct> moneyTransaction(String id, double money) {
+    public Mono<BankProduct> moneyTransaction(String numAccount, double money) {
         try {
-            return bankRepo.findById(id)
+            return bankRepo.findByNumAccount(numAccount)
                     .flatMap(dbBankProd -> {
                         //resetear numero de transaccion actual si cambio el mes
                         if (diferentMonth(dbBankProd)) {
                             dbBankProd.setCurrentTransNumber(0);
                         }
                         //verificar si se debe pagar comision
-                        return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(perc -> {
+                        return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(com -> {
 
-                            double comission = abs(money * perc.getComission());
+                            double comission = abs(money * com.getComission());
                             double amount = money;
 
-                            boolean comissionAplicable =dbBankProd.getCurrentTransNumber() <= dbBankProd.getMaxTransactions();
+                            boolean comissionAplicable = dbBankProd.getCurrentTransNumber() > dbBankProd.getMaxTransactions();
 
                             if (comissionAplicable) {
                                 //aplicar comision
@@ -318,11 +320,12 @@ public class BankProductServiceImpl implements BankProductService {
                             if (currentMoney + amount > dbBankProd.getMinFin()) {
                                 dbBankProd.setTotal(currentMoney + amount);
                                 dbBankProd.setCurrentTransNumber(dbBankProd.getCurrentTransNumber() + 1);
+                                dbBankProd.setLastTransactionDate(new Date());
                                 //guardar log de comisiones
-                                if(comissionAplicable){
-                                    BankProductComission bpc =  new BankProductComission(dbBankProd.getNumAccount(),
-                                            comission,new Date());
-                                    bankProdComissionRepo.save(bpc).subscribe() ;
+                                if (comissionAplicable) {
+                                    BankProductComission bpc = new BankProductComission(dbBankProd.getNumAccount(),
+                                            money, comission, new Date());
+                                    bankProdComissionRepo.save(bpc).subscribe();
                                 }
                             } else {
                                 return Mono.error(new Exception("Monto de retiro supera el monto minimo de la cuenta"));
@@ -344,19 +347,52 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
 
+    private Mono<Double> getCreditDebt(String creditNumber) {
+        String url = "http://localhost:8020/creditprod/getDebt/" + creditNumber;
+        return WebClient.create()
+                .get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(Double.class);
+    }
+
+
+    private Mono<String> payCreditDebt(String creditNumber) {
+        BankProduct bp = new BankProduct();
+        String url = "http://localhost:8020/creditprod/payDebt/" + creditNumber;
+        return WebClient.create()
+                .post()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(String.class);
+    }
 
     @Override
-    public Mono<BankProduct> payCreditProduct(String id, double money, String creditNumber) {
+    public Mono<String> payCreditProduct(String numAccount, String creditNumber) {
         try {
             //traer monto a pagar del producto de credito de microservicio de productos de credito
-            //reducir monto de producto bancario
-            //enviar monto a microservicio de credito
-            return Mono.empty();
+            return bankRepo.findByNumAccount(numAccount).flatMap(dbBankProd -> {
+                Mono<Double> creditDebt = getCreditDebt(creditNumber);
+                return creditDebt.flatMap(debt -> {
+                    logger.info("debt=" + debt);
+                    if (dbBankProd.getTotal() - debt >= dbBankProd.getMinFin()) {
+                        dbBankProd.setTotal(dbBankProd.getTotal() - debt);
+                        bankRepo.save(dbBankProd).subscribe();
+                        //enviar pago a tarjeta de credito
+                        return payCreditDebt(creditNumber);
+                    } else {
+                        return Mono.error(new Exception("Monto a pagar supera el monto mínimo de la cuenta bancaria"));
+                    }
+                });
+            }).switchIfEmpty(Mono.error(new Exception("cuenta bancaria no encontrada")));
         } catch (Exception e) {
             return Mono.error(e);
         }
     }
 
-
+    @Override
+    public Flux<BankProductComission> comissionReport(DatesDTO dates){
+        return bankProdComissionRepo.findAllByComissionDateBetween(dates.getStartDate(),dates.getEndDate());
+    }
 
 }

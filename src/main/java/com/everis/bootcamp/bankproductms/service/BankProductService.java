@@ -1,6 +1,8 @@
 package com.everis.bootcamp.bankproductms.service;
 
+import com.everis.bootcamp.bankproductms.DTO.DatesDTO;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
+import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.model.BankProductType;
 
@@ -26,5 +28,7 @@ public interface BankProductService {
 
     public Flux<BankProductTransactionLog> findLogByClientNumDoc(String numDoc);
 
-    public Mono<BankProduct> payCreditProduct(String id, double money, String creditNumber);
+    public Mono<String> payCreditProduct(String numAccount, String creditNumber);
+
+    public Flux<BankProductComission> comissionReport(DatesDTO dates);
 }
