@@ -101,8 +101,8 @@ public class BankProductServiceImpl implements BankProductService {
                         }
 
                         //bankName
-                        if (bp.getBankName() != null) {
-                            dbBankProd.setBankName(bp.getBankName());
+                        if (bp.getBankId() != null) {
+                            dbBankProd.setBankId(bp.getBankId());
                         }
 
                         //holders
@@ -165,6 +165,16 @@ public class BankProductServiceImpl implements BankProductService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(String.class);
+    }
+
+
+    private Mono<Boolean> getExistBank(String numId) {
+        String url = "http://localhost:8002/bank/exist/" + numId;
+        return WebClient.create()
+                .get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(Boolean.class);
     }
 
     private Mono<BankProduct> saveNewClientTypes(String ct, String idProdType, BankProduct bp) {
@@ -237,46 +247,55 @@ public class BankProductServiceImpl implements BankProductService {
     @Override
     public Mono<BankProduct> save(BankProduct bp) {
         try {
-            if (bp.getCreateDate() == null) {
-                bp.setCreateDate(new Date());
-            } else {
-                bp.setCreateDate(bp.getCreateDate());
-            }
-            if (bp.getMaxTransactions() <= 0) {
-                return Mono.error(new Exception("Ingresar un número de transacciones máximas válido"));
-            }
-            bp.setCurrentTransNumber(0);
-            if (bp.getTotal() < 0) {
-                return Mono.error(new Exception("Ingresar un saldo valido"));
-            }
-            bp.setLastTransactionDate(new Date());
-            //Añadir numDocCliente a Holders
-            Set<String> holders = new HashSet<>();
-            holders.add(bp.getClientNumDoc());
-            bp.setHolders(holders);
-            //crear authorized
-            bp.setAuthorized(new HashSet<>());
+            Mono<Boolean> existeBanco = getExistBank(bp.getBankId());
 
-            String idProdType = bp.getIdProdType();
-            //traer al tipo de cliente de la api clientes
-            Mono<String> clientType = getClientTypeFromApi(bp.getClientNumDoc());
-
-            return clientType.flatMap(ct -> {
-                logger.info("client type -> " + ct);
-                if (!ct.equals("-1")) {
-                    //si al final existe, buscar el tipo de cliente
-                    if (ct.equals("1") || ct.equals("2")) {
-                        return saveCliPerEmp(ct, idProdType, bp);
-                    } else if (ct.equals("3") || ct.equals("4") || ct.equals("5")) {
-                        return saveNewClientTypes(ct, idProdType, bp);
+            return existeBanco.flatMap(existe -> {
+                if (existe) {
+                    if (bp.getCreateDate() == null) {
+                        bp.setCreateDate(new Date());
+                    } else {
+                        bp.setCreateDate(bp.getCreateDate());
                     }
+                    if (bp.getMaxTransactions() <= 0) {
+                        return Mono.error(new Exception("Ingresar un número de transacciones máximas válido"));
+                    }
+                    bp.setCurrentTransNumber(0);
+                    if (bp.getTotal() < 0) {
+                        return Mono.error(new Exception("Ingresar un saldo valido"));
+                    }
+                    bp.setLastTransactionDate(new Date());
+                    //Añadir numDocCliente a Holders
+                    Set<String> holders = new HashSet<>();
+                    holders.add(bp.getClientNumDoc());
+                    bp.setHolders(holders);
+                    //crear authorized
+                    bp.setAuthorized(new HashSet<>());
 
-                    return Mono.error(new Exception("Tipo de cliente no soportado"));
+                    String idProdType = bp.getIdProdType();
+                    //traer al tipo de cliente de la api clientes
+                    Mono<String> clientType = getClientTypeFromApi(bp.getClientNumDoc());
+
+                    return clientType.flatMap(ct -> {
+                        logger.info("client type -> " + ct);
+                        if (!ct.equals("-1")) {
+                            //si al final existe, buscar el tipo de cliente
+                            if (ct.equals("1") || ct.equals("2")) {
+                                return saveCliPerEmp(ct, idProdType, bp);
+                            } else if (ct.equals("3") || ct.equals("4") || ct.equals("5")) {
+                                return saveNewClientTypes(ct, idProdType, bp);
+                            }
+
+                            return Mono.error(new Exception("Tipo de cliente no soportado"));
 
 
+                        } else {
+                            return Mono.error(new Exception("Cliente no registrado"));
+                        }
+                    });
                 } else {
-                    return Mono.error(new Exception("Cliente no registrado"));
+                    return Mono.error(new Exception("El banco del producto no existe"));
                 }
+
             });
 
         } catch (Exception e) {
@@ -391,8 +410,8 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     @Override
-    public Flux<BankProductComission> comissionReport(DatesDTO dates){
-        return bankProdComissionRepo.findAllByComissionDateBetween(dates.getStartDate(),dates.getEndDate());
+    public Flux<BankProductComission> comissionReport(DatesDTO dates) {
+        return bankProdComissionRepo.findAllByComissionDateBetween(dates.getStartDate(), dates.getEndDate());
     }
 
 }
