@@ -41,7 +41,7 @@ public class BankProductController {
     @GetMapping("/test")
     public Mono<BankProduct> saludo() {
         BankProduct hola = new BankProduct();
-        hola.setBankName("BCP");
+        hola.setBankId("1");
         return Mono.justOrEmpty(hola);
     }
 
@@ -67,6 +67,13 @@ public class BankProductController {
     @GetMapping("/log/{clientNumDoc}")
     public Flux<BankProductTransactionLog> findLogByClientNumDoc(@PathVariable("clientNumDoc") String clientNumDoc) {
         return service.findLogByClientNumDoc(clientNumDoc);
+    }
+
+    @ApiOperation(value = "Service used to return all bank product of a client registered in certain bank")
+    @GetMapping("/find/{clientNumDoc}/{bankId}")
+    public Flux<BankProduct> findByClientNumDocAndBankId(@PathVariable("clientNumDoc") String clientNumDoc,
+                                                         @PathVariable("bankId") String bankId) {
+        return service.findByNumAccountAndBankId(clientNumDoc, bankId);
     }
 
     //GUARDAR
@@ -100,7 +107,7 @@ public class BankProductController {
     @ApiOperation(value = "Service used to manage money transactions of a bank product")
     @PostMapping("/transaction/{numAccount}")
     public Mono<ResponseEntity<BankProduct>> transaction(@PathVariable("numAccount") String numAccount, @RequestBody double money) {
-        return service.moneyTransaction(numAccount, money)
+        return service.depositOrRetireMoney(numAccount, money)
                 .map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
                         .contentType(MediaType.APPLICATION_JSON).body(b))
                 .defaultIfEmpty(ResponseEntity.notFound().build());
@@ -114,10 +121,26 @@ public class BankProductController {
         return service.payCreditProduct(numAccount, creditNumber);
     }
 
-    //PAGAR DEUDA DE CREDITO
+    //PAGAR A OTRA CUENTA DE BANCO
+    @ApiOperation(value = "Service used to pay credit card debt")
+    @PostMapping("/bankProductTransaction/{numAccountOrigin}/{numAccountDestination}")
+    public Mono<String> bankProductTransaction(@PathVariable("numAccountOrigin") String numAccountOrigin,
+                                               @PathVariable("numAccountDestination") String numAccountDestination,
+                                               @RequestBody double money) {
+        return service.bankProductTransaction(numAccountOrigin, numAccountDestination, money);
+    }
+
+    //REPORTE DE COMISIONES
     @ApiOperation(value = "Service used to get all the comissions on a date range")
     @PostMapping("/comissionReport")
     public Flux<BankProductComission> comissionReport(@RequestBody DatesDTO dates) {
         return service.comissionReport(dates);
+    }
+
+    //REPORTE DE PRODUCTOS
+    @ApiOperation(value = "Service used to get all the products on a date range")
+    @PostMapping("/productReport")
+    public Flux<BankProduct> productReport(@RequestBody DatesDTO dates) {
+        return service.productReport(dates);
     }
 }

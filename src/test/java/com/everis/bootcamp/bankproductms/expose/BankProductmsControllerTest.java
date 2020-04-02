@@ -37,7 +37,7 @@ public class BankProductmsControllerTest {
     @BeforeAll
     public static void setup() {
         bpTest = new BankProduct();
-        bpTest.setBankName("BCP");
+        bpTest.setBankId("1");
     }
 
     @Test

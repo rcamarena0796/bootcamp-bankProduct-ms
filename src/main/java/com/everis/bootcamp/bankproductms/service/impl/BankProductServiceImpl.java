@@ -249,53 +249,57 @@ public class BankProductServiceImpl implements BankProductService {
         try {
             Mono<Boolean> existeBanco = getExistBank(bp.getBankId());
 
+            Mono<Boolean> debts = validateClientDebts(bp.getClientNumDoc());
+
             return existeBanco.flatMap(existe -> {
-                if (existe) {
-                    if (bp.getCreateDate() == null) {
-                        bp.setCreateDate(new Date());
-                    } else {
-                        bp.setCreateDate(bp.getCreateDate());
-                    }
-                    if (bp.getMaxTransactions() <= 0) {
-                        return Mono.error(new Exception("Ingresar un número de transacciones máximas válido"));
-                    }
-                    bp.setCurrentTransNumber(0);
-                    if (bp.getTotal() < 0) {
-                        return Mono.error(new Exception("Ingresar un saldo valido"));
-                    }
-                    bp.setLastTransactionDate(new Date());
-                    //Añadir numDocCliente a Holders
-                    Set<String> holders = new HashSet<>();
-                    holders.add(bp.getClientNumDoc());
-                    bp.setHolders(holders);
-                    //crear authorized
-                    bp.setAuthorized(new HashSet<>());
-
-                    String idProdType = bp.getIdProdType();
-                    //traer al tipo de cliente de la api clientes
-                    Mono<String> clientType = getClientTypeFromApi(bp.getClientNumDoc());
-
-                    return clientType.flatMap(ct -> {
-                        logger.info("client type -> " + ct);
-                        if (!ct.equals("-1")) {
-                            //si al final existe, buscar el tipo de cliente
-                            if (ct.equals("1") || ct.equals("2")) {
-                                return saveCliPerEmp(ct, idProdType, bp);
-                            } else if (ct.equals("3") || ct.equals("4") || ct.equals("5")) {
-                                return saveNewClientTypes(ct, idProdType, bp);
-                            }
-
-                            return Mono.error(new Exception("Tipo de cliente no soportado"));
-
-
+                return debts.flatMap(validDebts -> {
+                    if (existe && validDebts) {
+                        if (bp.getCreateDate() == null) {
+                            bp.setCreateDate(new Date());
                         } else {
-                            return Mono.error(new Exception("Cliente no registrado"));
+                            bp.setCreateDate(bp.getCreateDate());
                         }
-                    });
-                } else {
-                    return Mono.error(new Exception("El banco del producto no existe"));
-                }
+                        if (bp.getMaxTransactions() <= 0) {
+                            return Mono.error(new Exception("Ingresar un número de transacciones máximas válido"));
+                        }
+                        bp.setCurrentTransNumber(0);
+                        if (bp.getTotal() < 0) {
+                            return Mono.error(new Exception("Ingresar un saldo valido"));
+                        }
+                        bp.setLastTransactionDate(new Date());
+                        //Añadir numDocCliente a Holders
+                        Set<String> holders = new HashSet<>();
+                        holders.add(bp.getClientNumDoc());
+                        bp.setHolders(holders);
+                        //crear authorized
+                        bp.setAuthorized(new HashSet<>());
 
+                        String idProdType = bp.getIdProdType();
+                        //traer al tipo de cliente de la api clientes
+                        Mono<String> clientType = getClientTypeFromApi(bp.getClientNumDoc());
+
+                        return clientType.flatMap(ct -> {
+                            logger.info("client type -> " + ct);
+                            if (!ct.equals("-1")) {
+                                //si al final existe, buscar el tipo de cliente
+                                if (ct.equals("1") || ct.equals("2")) {
+                                    return saveCliPerEmp(ct, idProdType, bp);
+                                } else if (ct.equals("3") || ct.equals("4") || ct.equals("5")) {
+                                    return saveNewClientTypes(ct, idProdType, bp);
+                                }
+
+                                return Mono.error(new Exception("Tipo de cliente no soportado"));
+
+
+                            } else {
+                                return Mono.error(new Exception("Cliente no registrado"));
+                            }
+                        });
+                    } else {
+                        return Mono.error(new Exception("El banco del producto no existe"));
+                    }
+
+                });
             });
 
         } catch (Exception e) {
@@ -313,53 +317,105 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     @Override
-    public Mono<BankProduct> moneyTransaction(String numAccount, double money) {
+    public Mono<BankProduct> depositOrRetireMoney(String numAccount, double money) {
         try {
             return bankRepo.findByNumAccount(numAccount)
                     .flatMap(dbBankProd -> {
-                        //resetear numero de transaccion actual si cambio el mes
-                        if (diferentMonth(dbBankProd)) {
-                            dbBankProd.setCurrentTransNumber(0);
-                        }
-                        //verificar si se debe pagar comision
-                        return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(com -> {
 
-                            double comission = abs(money * com.getComission());
-                            double amount = money;
+                        Mono<Boolean> existeBanco = getExistBank(dbBankProd.getBankId());
 
-                            boolean comissionAplicable = dbBankProd.getCurrentTransNumber() > dbBankProd.getMaxTransactions();
-
-                            if (comissionAplicable) {
-                                //aplicar comision
-                                amount = money - comission;
-                            }
-
-                            double currentMoney = dbBankProd.getTotal();
-
-                            if (currentMoney + amount > dbBankProd.getMinFin()) {
-                                dbBankProd.setTotal(currentMoney + amount);
-                                dbBankProd.setCurrentTransNumber(dbBankProd.getCurrentTransNumber() + 1);
-                                dbBankProd.setLastTransactionDate(new Date());
-                                //guardar log de comisiones
-                                if (comissionAplicable) {
-                                    BankProductComission bpc = new BankProductComission(dbBankProd.getNumAccount(),
-                                            money, comission, new Date());
-                                    bankProdComissionRepo.save(bpc).subscribe();
+                        return existeBanco.flatMap(existe -> {
+                            if (existe) {
+                                //resetear numero de transaccion actual si cambio el mes
+                                if (diferentMonth(dbBankProd)) {
+                                    dbBankProd.setCurrentTransNumber(0);
                                 }
+                                //verificar si se debe pagar comision
+                                return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(com -> {
+
+                                    double comission = abs(money * com.getComission());
+                                    double amount = money;
+
+                                    boolean comissionAplicable = dbBankProd.getCurrentTransNumber() > dbBankProd.getMaxTransactions();
+
+                                    if (comissionAplicable) {
+                                        //aplicar comision
+                                        amount = money - comission;
+                                    }
+
+                                    double currentMoney = dbBankProd.getTotal();
+
+                                    if (currentMoney + amount > dbBankProd.getMinFin()) {
+                                        dbBankProd.setTotal(currentMoney + amount);
+                                        dbBankProd.setCurrentTransNumber(dbBankProd.getCurrentTransNumber() + 1);
+                                        dbBankProd.setLastTransactionDate(new Date());
+                                        //guardar log de comisiones
+                                        if (comissionAplicable) {
+                                            BankProductComission bpc = new BankProductComission(dbBankProd.getNumAccount(),
+                                                    money, comission, new Date());
+                                            bankProdComissionRepo.save(bpc).subscribe();
+                                        }
+                                    } else {
+                                        return Mono.error(new Exception("Monto de retiro supera el monto minimo de la cuenta"));
+                                    }
+
+                                    //guardar log
+                                    BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
+                                            dbBankProd.getNumAccount(), dbBankProd.getTotal() - money, money, new Date());
+                                    logRepo.save(transactionLog).subscribe();
+
+                                    return bankRepo.save(dbBankProd);
+
+                                });
                             } else {
-                                return Mono.error(new Exception("Monto de retiro supera el monto minimo de la cuenta"));
+                                return Mono.error(new Exception("Banco no existe"));
                             }
-
-                            //guardar log
-                            BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
-                                    dbBankProd.getNumAccount(), dbBankProd.getTotal() - money, money, new Date());
-                            logRepo.save(transactionLog).subscribe();
-
-                            return bankRepo.save(dbBankProd);
 
                         });
 
                     }).switchIfEmpty(Mono.error(new Exception("cuenta no encontrada")));
+        } catch (Exception e) {
+            return Mono.error(e);
+        }
+    }
+
+    @Override
+    public Mono<String> bankProductTransaction(String numAccountOrigin, String numAccountDestination, double money) {
+        try {
+            if (money >= 0) {
+                return bankRepo.findByNumAccount(numAccountOrigin).flatMap(bpOrigin -> {
+                    if (bpOrigin.getTotal() - money >= bpOrigin.getMinFin()) {
+
+                        return bankRepo.findByNumAccount(numAccountDestination).flatMap(bpDestination -> {
+                            Mono<Boolean> bankOriginExist = getExistBank(bpOrigin.getBankId());
+                            Mono<Boolean> bankDestinationExist = getExistBank(bpDestination.getBankId());
+
+                            return bankOriginExist.flatMap(originExist -> {
+                                return bankDestinationExist.flatMap(destinationExist -> {
+                                    if (originExist) {
+                                        if (destinationExist) {
+                                            bpOrigin.setTotal(bpOrigin.getTotal() - money);
+                                            bpDestination.setTotal(bpDestination.getTotal() + money);
+                                            bankRepo.save(bpOrigin).subscribe();
+                                            bankRepo.save(bpDestination).subscribe();
+                                            return Mono.justOrEmpty("Transeferencia realizada exitosamente");
+
+                                        } else {
+                                            return Mono.error(new Exception("banco de destino no existe"));
+                                        }
+                                    } else {
+                                        return Mono.error(new Exception("banco de origen no existe"));
+                                    }
+                                });
+                            });
+                        }).switchIfEmpty(Mono.error(new Exception("Cuenta destino no existe")));
+                    } else {
+                        return Mono.error(new Exception("el monto supera el limite de la cuenta de origen"));
+                    }
+                }).switchIfEmpty(Mono.error(new Exception("Cuenta origen no existe")));
+            } else {
+                return Mono.error(new Exception("El monto no puede ser menor a 0"));
+            }
         } catch (Exception e) {
             return Mono.error(e);
         }
@@ -377,7 +433,6 @@ public class BankProductServiceImpl implements BankProductService {
 
 
     private Mono<String> payCreditDebt(String creditNumber) {
-        BankProduct bp = new BankProduct();
         String url = "http://localhost:8020/creditprod/payDebt/" + creditNumber;
         return WebClient.create()
                 .post()
@@ -386,22 +441,48 @@ public class BankProductServiceImpl implements BankProductService {
                 .bodyToMono(String.class);
     }
 
+    private Mono<Boolean> validateClientDebts(String clientNumDoc) {
+        String url = "http://localhost:8020/creditprod/validDebt/" + clientNumDoc;
+        return WebClient.create()
+                .post()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(Boolean.class);
+    }
+
     @Override
     public Mono<String> payCreditProduct(String numAccount, String creditNumber) {
         try {
             //traer monto a pagar del producto de credito de microservicio de productos de credito
             return bankRepo.findByNumAccount(numAccount).flatMap(dbBankProd -> {
-                Mono<Double> creditDebt = getCreditDebt(creditNumber);
-                return creditDebt.flatMap(debt -> {
-                    logger.info("debt=" + debt);
-                    if (dbBankProd.getTotal() - debt >= dbBankProd.getMinFin()) {
-                        dbBankProd.setTotal(dbBankProd.getTotal() - debt);
-                        bankRepo.save(dbBankProd).subscribe();
-                        //enviar pago a tarjeta de credito
-                        return payCreditDebt(creditNumber);
+                Mono<Boolean> existeBanco = getExistBank(dbBankProd.getBankId());
+                return existeBanco.flatMap(existe -> {
+
+                    if (existe) {
+                        Mono<Double> creditDebt = getCreditDebt(creditNumber);
+                        return creditDebt.flatMap(debt -> {
+                            logger.info("debt=" + debt);
+                            if (dbBankProd.getTotal() - debt >= dbBankProd.getMinFin()) {
+                                dbBankProd.setTotal(dbBankProd.getTotal() - debt);
+                                //enviar pago a tarjeta de credito
+                                Mono<String> creditMsResponse = payCreditDebt(creditNumber);
+                                return creditMsResponse.flatMap(response->{
+                                    if(!response.equals("-1")){
+                                        bankRepo.save(dbBankProd).subscribe();
+                                        return Mono.justOrEmpty(response);
+                                    }else{
+                                        return Mono.error(new Exception("El banco del producto de credito no existe"));
+                                    }
+                                });
+                            } else {
+                                return Mono.error(new Exception("Monto a pagar supera el monto mínimo de la cuenta bancaria"));
+                            }
+                        });
+
                     } else {
-                        return Mono.error(new Exception("Monto a pagar supera el monto mínimo de la cuenta bancaria"));
+                        return Mono.error(new Exception("Banco de cuenta bancaria no existe"));
                     }
+
                 });
             }).switchIfEmpty(Mono.error(new Exception("cuenta bancaria no encontrada")));
         } catch (Exception e) {
@@ -414,4 +495,13 @@ public class BankProductServiceImpl implements BankProductService {
         return bankProdComissionRepo.findAllByComissionDateBetween(dates.getStartDate(), dates.getEndDate());
     }
 
+    @Override
+    public Flux<BankProduct> findByNumAccountAndBankId(String numAccount, String bankId) {
+        return bankRepo.findByClientNumDocAndBankId(numAccount, bankId);
+    }
+
+    @Override
+    public Flux<BankProduct> productReport(DatesDTO dates) {
+        return bankRepo.findAllByModifyDateBetween(dates.getStartDate(), dates.getEndDate());
+    }
 }

@@ -24,11 +24,18 @@ public interface BankProductService {
 
     public Mono<BankProduct> save(BankProduct bp);
 
-    public Mono<BankProduct> moneyTransaction(String id, double money);
+    public Mono<BankProduct> depositOrRetireMoney(String id, double money);
 
     public Flux<BankProductTransactionLog> findLogByClientNumDoc(String numDoc);
 
     public Mono<String> payCreditProduct(String numAccount, String creditNumber);
 
     public Flux<BankProductComission> comissionReport(DatesDTO dates);
+
+    public Flux<BankProduct> findByNumAccountAndBankId(String numAccount, String bankId);
+
+    public Flux<BankProduct> productReport(DatesDTO dates);
+
+    public Mono<String> bankProductTransaction(String numAccountOrigin, String numAccountDestination, double money);
+
 }
