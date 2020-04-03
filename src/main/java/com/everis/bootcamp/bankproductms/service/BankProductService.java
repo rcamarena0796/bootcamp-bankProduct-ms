@@ -1,10 +1,9 @@
 package com.everis.bootcamp.bankproductms.service;
 
-import com.everis.bootcamp.bankproductms.DTO.DatesDTO;
+import com.everis.bootcamp.bankproductms.dto.DatesDTO;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
-import com.everis.bootcamp.bankproductms.model.BankProductType;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;

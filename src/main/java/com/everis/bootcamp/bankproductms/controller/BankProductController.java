@@ -1,6 +1,6 @@
 package com.everis.bootcamp.bankproductms.controller;
 
-import com.everis.bootcamp.bankproductms.DTO.DatesDTO;
+import com.everis.bootcamp.bankproductms.dto.DatesDTO;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;

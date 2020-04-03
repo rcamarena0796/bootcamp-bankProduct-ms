@@ -2,13 +2,12 @@ package com.everis.bootcamp.bankproductms.service.impl;
 
 import java.util.*;
 
-import com.everis.bootcamp.bankproductms.DTO.DatesDTO;
+import com.everis.bootcamp.bankproductms.dto.DatesDTO;
 import com.everis.bootcamp.bankproductms.dao.*;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
