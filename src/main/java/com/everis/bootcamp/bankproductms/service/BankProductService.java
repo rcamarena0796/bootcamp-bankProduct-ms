@@ -1,6 +1,7 @@
 package com.everis.bootcamp.bankproductms.service;
 
 import com.everis.bootcamp.bankproductms.dto.DatesDTO;
+import com.everis.bootcamp.bankproductms.dto.MessageDTO;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
@@ -23,11 +24,11 @@ public interface BankProductService {
 
     public Mono<BankProduct> save(BankProduct bp);
 
-    public Mono<BankProduct> depositOrRetireMoney(String id, double money);
+    public Mono<MessageDTO> depositOrRetireMoney(String id, double money);
 
     public Flux<BankProductTransactionLog> findLogByClientNumDoc(String numDoc);
 
-    public Mono<String> payCreditProduct(String numAccount, String creditNumber);
+    public Mono<MessageDTO> payCreditProduct(String numAccount, String creditNumber);
 
     public Flux<BankProductComission> comissionReport(DatesDTO dates);
 
@@ -35,6 +36,9 @@ public interface BankProductService {
 
     public Flux<BankProduct> productReport(DatesDTO dates);
 
-    public Mono<String> bankProductTransaction(String numAccountOrigin, String numAccountDestination, double money);
+    public Mono<MessageDTO> bankProductTransaction(String numAccountOrigin, String numAccountDestination, double money);
 
+    public Mono<String> getBankId(String numAccount);
+
+    public Mono<MessageDTO> chargeComission(String numAccount, double comission);
 }

@@ -1,6 +1,7 @@
 package com.everis.bootcamp.bankproductms.controller;
 
 import com.everis.bootcamp.bankproductms.dto.DatesDTO;
+import com.everis.bootcamp.bankproductms.dto.MessageDTO;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
@@ -57,6 +58,12 @@ public class BankProductController {
         return service.findAll();
     }
 
+    @ApiOperation(value = "Service used to get bank product id")
+    @GetMapping("/getBankId/{numAccount}")
+    public Mono<String> getBankId(@PathVariable("numAccount") String numAccount) {
+        return service.getBankId(numAccount);
+    }
+
     @ApiOperation(value = "Service used to find a bank product by id")
     @GetMapping("/find/{id}")
     public Mono<BankProduct> findById(@PathVariable("id") String id) {
@@ -103,7 +110,7 @@ public class BankProductController {
                 .defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
     }
 
-    //TRANSACCION
+   /* //TRANSACCION
     @ApiOperation(value = "Service used to manage money transactions of a bank product")
     @PostMapping("/transaction/{numAccount}")
     public Mono<ResponseEntity<BankProduct>> transaction(@PathVariable("numAccount") String numAccount, @RequestBody double money) {
@@ -111,20 +118,27 @@ public class BankProductController {
                 .map(b -> ResponseEntity.created(URI.create("/api/bankproduct".concat(b.getId())))
                         .contentType(MediaType.APPLICATION_JSON).body(b))
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }*/
+
+    //TRANSACCION
+    @ApiOperation(value = "Service used to manage money transactions of a bank product")
+    @PostMapping("/transaction/{numAccount}")
+    public Mono<MessageDTO> transaction(@PathVariable("numAccount") String numAccount, @RequestBody double money) {
+        return service.depositOrRetireMoney(numAccount, money);
     }
 
     //PAGAR DEUDA DE CREDITO
     @ApiOperation(value = "Service used to pay credit card debt")
     @PostMapping("/payCreditDebt/{numAccount}/{creditNumber}")
-    public Mono<String> payCreditDebt(@PathVariable("numAccount") String numAccount,
+    public Mono<MessageDTO> payCreditDebt(@PathVariable("numAccount") String numAccount,
                                       @PathVariable("creditNumber") String creditNumber) {
         return service.payCreditProduct(numAccount, creditNumber);
     }
 
     //PAGAR A OTRA CUENTA DE BANCO
-    @ApiOperation(value = "Service used to pay credit card debt")
+    @ApiOperation(value = "Service used to pay another bank account")
     @PostMapping("/bankProductTransaction/{numAccountOrigin}/{numAccountDestination}")
-    public Mono<String> bankProductTransaction(@PathVariable("numAccountOrigin") String numAccountOrigin,
+    public Mono<MessageDTO> bankProductTransaction(@PathVariable("numAccountOrigin") String numAccountOrigin,
                                                @PathVariable("numAccountDestination") String numAccountDestination,
                                                @RequestBody double money) {
         return service.bankProductTransaction(numAccountOrigin, numAccountDestination, money);
@@ -142,5 +156,13 @@ public class BankProductController {
     @PostMapping("/productReport")
     public Flux<BankProduct> productReport(@RequestBody DatesDTO dates) {
         return service.productReport(dates);
+    }
+
+    //COBRAR COMISION EXTERNA
+    @ApiOperation(value = "Service used to pay external comission")
+    @PostMapping("/chargeExtComission/{numAccount}")
+    public Mono<MessageDTO> chargeExtComission(@PathVariable("numAccount") String numAccount,
+                                           @RequestBody double externalComission) {
+        return service.chargeComission(numAccount, externalComission);
     }
 }

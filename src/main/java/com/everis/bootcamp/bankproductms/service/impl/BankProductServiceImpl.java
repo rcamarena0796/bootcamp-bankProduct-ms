@@ -2,8 +2,10 @@ package com.everis.bootcamp.bankproductms.service.impl;
 
 import java.util.*;
 
+import com.everis.bootcamp.bankproductms.dto.BankMaxTransDTO;
 import com.everis.bootcamp.bankproductms.dto.DatesDTO;
 import com.everis.bootcamp.bankproductms.dao.*;
+import com.everis.bootcamp.bankproductms.dto.MessageDTO;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.model.BankProductComission;
 import com.everis.bootcamp.bankproductms.model.BankProductTransactionLog;
@@ -176,6 +178,16 @@ public class BankProductServiceImpl implements BankProductService {
                 .bodyToMono(Boolean.class);
     }
 
+
+    private Mono<BankMaxTransDTO> getBankComission(String numId) {
+        String url = "http://localhost:8002/bank/bankComission/" + numId;
+        return WebClient.create()
+                .get()
+                .uri(url)
+                .retrieve()
+                .bodyToMono(BankMaxTransDTO.class);
+    }
+
     private Mono<BankProduct> saveNewClientTypes(String ct, String idProdType, BankProduct bp) {
         //verificar monto minimo y monto fin
         if (bp.getTotal() <= 0) {
@@ -316,7 +328,7 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     @Override
-    public Mono<BankProduct> depositOrRetireMoney(String numAccount, double money) {
+    public Mono<MessageDTO> depositOrRetireMoney(String numAccount, double money) {
         try {
             return bankRepo.findByNumAccount(numAccount)
                     .flatMap(dbBankProd -> {
@@ -330,41 +342,58 @@ public class BankProductServiceImpl implements BankProductService {
                                     dbBankProd.setCurrentTransNumber(0);
                                 }
                                 //verificar si se debe pagar comision
-                                return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(com -> {
+                                //cambiar la forma en que se busca la comision
+                                Mono<BankMaxTransDTO> maxTransMono = getBankComission(dbBankProd.getBankId());
 
-                                    double comission = abs(money * com.getComission());
-                                    double amount = money;
+                                return maxTransMono.flatMap(maxTrans -> {
+                                    HashMap<String, Integer> productMaxTrans = maxTrans.getProductMaxTrans();
+                                    Integer mt = productMaxTrans.get(dbBankProd.getIdProdType());
 
-                                    boolean comissionAplicable = dbBankProd.getCurrentTransNumber() > dbBankProd.getMaxTransactions();
+                                    logger.info(productMaxTrans.toString());
+                                    logger.info(dbBankProd.getIdProdType());
+                                    if (mt != null) {
+                                        return comissionRepo.findFirstByOrderByDateCreatedDesc().flatMap(com -> {
 
-                                    if (comissionAplicable) {
-                                        //aplicar comision
-                                        amount = money - comission;
-                                    }
+                                            double comission = abs(money * com.getComission());
+                                            double amount = money;
 
-                                    double currentMoney = dbBankProd.getTotal();
+                                            boolean comissionAplicable = dbBankProd.getCurrentTransNumber() > mt;
 
-                                    if (currentMoney + amount > dbBankProd.getMinFin()) {
-                                        dbBankProd.setTotal(currentMoney + amount);
-                                        dbBankProd.setCurrentTransNumber(dbBankProd.getCurrentTransNumber() + 1);
-                                        dbBankProd.setLastTransactionDate(new Date());
-                                        //guardar log de comisiones
-                                        if (comissionAplicable) {
-                                            BankProductComission bpc = new BankProductComission(dbBankProd.getNumAccount(),
-                                                    money, comission, new Date());
-                                            bankProdComissionRepo.save(bpc).subscribe();
-                                        }
+                                            if (comissionAplicable) {
+                                                //aplicar comision
+                                                amount = money - comission;
+                                            }
+
+                                            double currentMoney = dbBankProd.getTotal();
+
+                                            if (currentMoney + amount > dbBankProd.getMinFin()) {
+                                                dbBankProd.setTotal(currentMoney + amount);
+                                                dbBankProd.setCurrentTransNumber(dbBankProd.getCurrentTransNumber() + 1);
+                                                dbBankProd.setLastTransactionDate(new Date());
+                                                //guardar log de comisiones
+                                                if (comissionAplicable) {
+                                                    BankProductComission bpc = new BankProductComission(dbBankProd.getNumAccount(),
+                                                            money, comission, new Date());
+                                                    bankProdComissionRepo.save(bpc).subscribe();
+                                                }
+                                            } else {
+                                                return Mono.error(new Exception("Monto de retiro supera el monto minimo de la cuenta"));
+                                            }
+
+                                            //guardar log
+                                            BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
+                                                    dbBankProd.getNumAccount(), dbBankProd.getTotal() - money, money, new Date());
+                                            logRepo.save(transactionLog).subscribe();
+
+                                            bankRepo.save(dbBankProd).subscribe();
+
+                                            return Mono.just(new MessageDTO("1", "Transaccion realizada correctamente"));
+
+                                        });
+
                                     } else {
-                                        return Mono.error(new Exception("Monto de retiro supera el monto minimo de la cuenta"));
+                                        return Mono.error(new Exception("No se encontro maximo numero de transacciones en el banco para el tipo de producto bancario"));
                                     }
-
-                                    //guardar log
-                                    BankProductTransactionLog transactionLog = new BankProductTransactionLog(dbBankProd.getClientNumDoc(),
-                                            dbBankProd.getNumAccount(), dbBankProd.getTotal() - money, money, new Date());
-                                    logRepo.save(transactionLog).subscribe();
-
-                                    return bankRepo.save(dbBankProd);
-
                                 });
                             } else {
                                 return Mono.error(new Exception("Banco no existe"));
@@ -379,7 +408,7 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     @Override
-    public Mono<String> bankProductTransaction(String numAccountOrigin, String numAccountDestination, double money) {
+    public Mono<MessageDTO> bankProductTransaction(String numAccountOrigin, String numAccountDestination, double money) {
         try {
             if (money >= 0) {
                 return bankRepo.findByNumAccount(numAccountOrigin).flatMap(bpOrigin -> {
@@ -397,7 +426,7 @@ public class BankProductServiceImpl implements BankProductService {
                                             bpDestination.setTotal(bpDestination.getTotal() + money);
                                             bankRepo.save(bpOrigin).subscribe();
                                             bankRepo.save(bpDestination).subscribe();
-                                            return Mono.justOrEmpty("Transeferencia realizada exitosamente");
+                                            return Mono.justOrEmpty(new MessageDTO("1", "Transaccion realizada correctamente"));
 
                                         } else {
                                             return Mono.error(new Exception("banco de destino no existe"));
@@ -450,7 +479,7 @@ public class BankProductServiceImpl implements BankProductService {
     }
 
     @Override
-    public Mono<String> payCreditProduct(String numAccount, String creditNumber) {
+    public Mono<MessageDTO> payCreditProduct(String numAccount, String creditNumber) {
         try {
             //traer monto a pagar del producto de credito de microservicio de productos de credito
             return bankRepo.findByNumAccount(numAccount).flatMap(dbBankProd -> {
@@ -465,11 +494,11 @@ public class BankProductServiceImpl implements BankProductService {
                                 dbBankProd.setTotal(dbBankProd.getTotal() - debt);
                                 //enviar pago a tarjeta de credito
                                 Mono<String> creditMsResponse = payCreditDebt(creditNumber);
-                                return creditMsResponse.flatMap(response->{
-                                    if(!response.equals("-1")){
+                                return creditMsResponse.flatMap(response -> {
+                                    if (!response.equals("-1")) {
                                         bankRepo.save(dbBankProd).subscribe();
-                                        return Mono.justOrEmpty(response);
-                                    }else{
+                                        return Mono.justOrEmpty(new MessageDTO("1", response));
+                                    } else {
                                         return Mono.error(new Exception("El banco del producto de credito no existe"));
                                     }
                                 });
@@ -502,5 +531,28 @@ public class BankProductServiceImpl implements BankProductService {
     @Override
     public Flux<BankProduct> productReport(DatesDTO dates) {
         return bankRepo.findAllByModifyDateBetween(dates.getStartDate(), dates.getEndDate());
+    }
+
+    @Override
+    public Mono<String> getBankId(String numAccount) {
+        return bankRepo.findByNumAccount(numAccount).map(bp -> {
+            return bp.getBankId();
+        });
+    }
+
+    @Override
+    public Mono<MessageDTO> chargeComission(String numAccount, double comission) {
+        return bankRepo.findByNumAccount(numAccount).flatMap(bp -> {
+            if (bp.getTotal() - comission >= bp.getMinFin()) {
+                bp.setTotal(bp.getTotal() - comission);
+                bankRepo.save(bp).subscribe();
+                return Mono.justOrEmpty(new MessageDTO("1", "Comision cobrada correctamente"));
+            } else {
+                double pendiente = bp.getMinFin() - bp.getTotal() + comission;
+                bp.setTotal(bp.getMinFin());
+                bankRepo.save(bp).subscribe();
+                return Mono.justOrEmpty(new MessageDTO("1", "Saldo insuficiente, usted debe: " + pendiente));
+            }
+        });
     }
 }
