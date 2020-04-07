@@ -113,8 +113,13 @@ public class BankProductController {
   @DeleteMapping("/delete/{id}")
   public Mono<ResponseEntity<Void>> delete(@PathVariable String id) {
     return service.delete(id)
-        .then(Mono.just(new ResponseEntity<Void>(HttpStatus.NO_CONTENT)))
-        .defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
+        .map(res -> ResponseEntity
+            .ok()
+            .<Void>build())
+        .defaultIfEmpty(ResponseEntity
+            .notFound()
+            .build()
+        );
   }
 
   //TRANSACCION

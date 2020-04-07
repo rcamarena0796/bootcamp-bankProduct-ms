@@ -142,11 +142,12 @@ public class BankProductServiceImpl implements BankProductService {
   }
 
   @Override
-  public Mono<Void> delete(String id) {
+  public Mono<String> delete(String id) {
     try {
-      return bankRepo.findById(id).flatMap(cl -> {
-        return bankRepo.delete(cl);
-      });
+      return bankRepo.findById(id).map(cl -> {
+        bankRepo.delete(cl).subscribe();
+        return cl.getId();
+      }).switchIfEmpty(Mono.empty());
     } catch (Exception e) {
       return Mono.error(e);
     }
@@ -186,8 +187,8 @@ public class BankProductServiceImpl implements BankProductService {
   }
 
 
-  private Mono<BankMaxTransDto> getBankComission(String numId) {
-    String url = "http://localhost:8002/bank/bankComission/" + numId;
+  private Mono<BankMaxTransDto> getBankMaxTrans(String numId) {
+    String url = "http://localhost:8002/bank/bankMaxTrans/" + numId;
     return WebClient.create()
         .get()
         .uri(url)
@@ -356,7 +357,7 @@ public class BankProductServiceImpl implements BankProductService {
                 }
                 //verificar si se debe pagar comision
                 //cambiar la forma en que se busca la comision
-                Mono<BankMaxTransDto> maxTransMono = getBankComission(dbBankProd.getBankId());
+                Mono<BankMaxTransDto> maxTransMono = getBankMaxTrans(dbBankProd.getBankId());
 
                 return maxTransMono.flatMap(maxTrans -> {
                   HashMap<String, Integer> productMaxTrans = maxTrans.getProductMaxTrans();

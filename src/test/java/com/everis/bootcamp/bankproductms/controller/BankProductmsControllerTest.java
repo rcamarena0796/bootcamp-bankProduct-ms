@@ -1,8 +1,7 @@
-package com.everis.bootcamp.bankproductms.expose;
+package com.everis.bootcamp.bankproductms.controller;
 
 
 
-import com.everis.bootcamp.bankproductms.controller.BankProductController;
 import com.everis.bootcamp.bankproductms.dao.BankProductRepository;
 import com.everis.bootcamp.bankproductms.model.BankProduct;
 import com.everis.bootcamp.bankproductms.service.BankProductService;
@@ -43,7 +42,7 @@ public class BankProductmsControllerTest {
     @Test
     public void test_controller_hola_mundo(){
         webClient.get()
-                .uri("/api/bankProduct/test")
+                .uri("/bankprod/test")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk()
