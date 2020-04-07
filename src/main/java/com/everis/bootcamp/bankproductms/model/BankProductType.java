@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "BANK_PRODUCT_TYPE")
 @EqualsAndHashCode(callSuper = false)
 public class BankProductType {
-	private String numId;
-	private String name;
+
+  private String numId;
+  private String name;
 }
