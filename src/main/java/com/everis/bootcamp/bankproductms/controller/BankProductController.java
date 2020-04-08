@@ -11,7 +11,6 @@ import io.swagger.annotations.ApiOperation;
 import java.net.URI;
 import javax.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -62,7 +61,7 @@ public class BankProductController {
   }
 
   @ApiOperation(value = "Service used to find a bank product by id")
-  @GetMapping("/find/{id}")
+  @GetMapping("/findById/{id}")
   public Mono<BankProduct> findById(@PathVariable("id") String id) {
     return service.findById(id);
   }
@@ -131,11 +130,19 @@ public class BankProductController {
   }
 
   //PAGAR DEUDA DE CREDITO
-  @ApiOperation(value = "Service used to pay credit card debt")
+  @ApiOperation(value = "Service used to pay credit debt")
   @PostMapping("/payCreditDebt/{numAccount}/{creditNumber}")
   public Mono<MessageDto> payCreditDebt(@PathVariable("numAccount") String numAccount,
       @PathVariable("creditNumber") String creditNumber) {
     return service.payCreditProduct(numAccount, creditNumber);
+  }
+
+  //PAGAR TARJETA DE CREDITO
+  @ApiOperation(value = "Service used to pay credit card debt")
+  @PostMapping("/payCreditCard/{numAccount}/{creditNumber}")
+  public Mono<MessageDto> payCreditCard(@PathVariable("numAccount") String numAccount,
+      @PathVariable("creditNumber") String creditNumber, @RequestBody double money) {
+    return service.payCreditCard(numAccount, creditNumber, money);
   }
 
   //PAGAR A OTRA CUENTA DE BANCO

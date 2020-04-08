@@ -42,4 +42,6 @@ public interface BankProductService {
   public Mono<String> getBankId(String numAccount);
 
   public Mono<MessageDto> chargeComission(String numAccount, double comission);
+
+  public Mono<MessageDto> payCreditCard(String numAccount, String creditNumber, double money);
 }

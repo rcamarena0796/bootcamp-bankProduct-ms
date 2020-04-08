@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.Set;
 import javax.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "BANK_PRODUCT")
+@Builder(toBuilder = true)
 @EqualsAndHashCode(callSuper = false)
 public class BankProduct {
 
@@ -28,7 +30,6 @@ public class BankProduct {
   private String idProdType;
   private double total;
   private double minFin;
-  private int maxTransactions;
   private int currentTransNumber;
   @NotBlank(message = "'clientNumDoc' is required")
   private String clientNumDoc;

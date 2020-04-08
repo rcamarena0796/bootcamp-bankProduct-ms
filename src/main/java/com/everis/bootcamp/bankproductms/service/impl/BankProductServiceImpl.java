@@ -283,10 +283,6 @@ public class BankProductServiceImpl implements BankProductService {
             } else {
               bp.setCreateDate(bp.getCreateDate());
             }
-            if (bp.getMaxTransactions() <= 0) {
-              return Mono
-                  .error(new Exception("Ingresar un número de transacciones máximas válido"));
-            }
             bp.setCurrentTransNumber(0);
             if (bp.getTotal() < 0) {
               return Mono.error(new Exception("Ingresar un saldo valido"));
@@ -579,5 +575,48 @@ public class BankProductServiceImpl implements BankProductService {
             .justOrEmpty(new MessageDto("1", "Saldo insuficiente, usted debe: " + pendiente));
       }
     });
+  }
+
+  private Mono<MessageDto> sendCreditCardPayment(String creditNum, double money) {
+    String url = "http://localhost:8020/creditprod/payCreditCard/" + creditNum;
+    return WebClient.create()
+        .post()
+        .uri(url)
+        .bodyValue(money)
+        .retrieve()
+        .bodyToMono(MessageDto.class);
+  }
+
+  @Override
+  public Mono<MessageDto> payCreditCard(String numAccount, String creditNumber, double money) {
+    try {
+      if (money >= 0) {
+        return bankRepo.findByNumAccount(numAccount).flatMap(dbBankProd -> {
+          if (dbBankProd.getTotal() - money >= dbBankProd.getMinFin()) {
+            Mono<Boolean> existBank = getExistBank(dbBankProd.getBankId());
+            return existBank.flatMap(exist -> {
+              if (exist) {
+                Mono<MessageDto> respuestaCredMono = sendCreditCardPayment(creditNumber, money);
+                return respuestaCredMono.flatMap(respuestaCred -> {
+                  if (respuestaCred.getCode().equals("1")) {
+                    dbBankProd.setTotal(dbBankProd.getTotal() - money);
+                    bankRepo.save(dbBankProd).subscribe();
+                  }
+                  return Mono.just(respuestaCred);
+                });
+              } else {
+                return Mono.just(new MessageDto("-1", "Banco de cuenta bancaria no encontrado"));
+              }
+            });
+          } else {
+            return Mono.just(new MessageDto("-1", "Monto supera el limite de la cuenta"));
+          }
+        }).switchIfEmpty(Mono.just(new MessageDto("-1", "Cuenta bancaria no encontrada")));
+      } else {
+        return Mono.just(new MessageDto("-1", "Monto negativo"));
+      }
+    } catch (Exception e) {
+      return Mono.error(e);
+    }
   }
 }
